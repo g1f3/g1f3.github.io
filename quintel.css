@@ -1,0 +1,29 @@
+* {
+    font-family: monospace;
+    font-size: 15px;
+}
+
+table.board {
+    border-spacing: 0;
+    border-collapse: collapse;
+}
+
+table.board td {
+    width: 20px;
+    height: 20px;
+    border: 1px solid;
+    border-color: #aaaaaa;
+    text-align: center;
+}
+
+.one {
+    background-color: black;
+    color: #aaaaaa;
+}
+
+
+.zero {
+    background-color: white;
+    color: #666666;
+}
+

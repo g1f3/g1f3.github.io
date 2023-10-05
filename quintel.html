@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Quintel</title>
+    <link rel="stylesheet" href="quintel.css" />
+    <link rel="icon" href="checkerboard.png" />
+    <script src="quintel.js" type="module" defer></script>
+  </head>
+  <body>
+    <p id="problem-selector">
+      <button id="p1">Problem 1</button>
+      <button id="p2">Problem 2</button>
+      <button id="p3">Problem 3</button>
+    </p>
+    <p>Problem <span id="pid">1</span> <button id="check">Check</button><span id="progress"></span></p>
+    <p>
+      <table>
+        <tr><th>Input</th><th>Standard output</th><th>Player output</th></tr>
+        <tr>
+          <td id="input"></td>
+          <td id="output1"></td>
+          <td id="output2"></td>
+        <tr>
+      </table>
+    </p>
+    <p id="display"></p>
+    <p><textarea id="code" rows="12" cols="80" placeholder="{{Your code here.}}"></textarea></p>
+    <p id="judgment"></p>
+    <p id="language"><details>
+        <summary>Language</summary>
+<pre>A - copy a board to focus
+#1100/0101 - copy a constant to focus
+o3x5 - an empty board with height 3, width 5
+>B - copy focus to a board
+&(B), |(B), ^(B) - bitwise and, or, xor with another board
+&&[lrtb], ||[lrtb], ^^[lrtb] - bitwise and, or, xor focus for each row/column
+~ - bitwise not
+=(B) - test equality against another board
+a[lrtb](B) - append board in direction
+t[lrtb][#] - take rows/columns from direction
+d[lrtb][#] - drop rows/columns from direction
+c[lrtb][#] - copy board in direction
+x[lrtb][#] - extend board in direction with zeros
+s[lrtb][#] - shift board in direction, fill with zeros
+r[lrtb][#] - roll board in direction
+mh, mv, md, mz - mirror horizontally, vertically, main-diagonally, secondary-diagonally
+mc, ma, mu - rotate clockwise, rotate anticlockwise, rotate upside-down
+
+[lrtb] - direction, one of l, r, t, and b
+[#] - number
+</pre>
+    </details></p>
+  </body>
+</html>
+<!-- A puzzle with a constant-time programming language. -->
