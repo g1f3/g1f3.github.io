@@ -38,11 +38,29 @@ const puzzles = {
         solution: '&(#1111/1000/1000/1000) >A sb1 sr1 |(A) >A sb2 sr2 |(A) >A sb4 sr4 |(A)',
         size: [4, 4],
     },
+    4: {
+        solution: (board) => L.Board.plot (board.height, board.width, (i, j) => {
+            var total = 0;
+            for (var di = -1; di <= 1; di ++) {
+                for (var dj = -1; dj <= 1; dj ++) {
+                    total += board.d ((i + di + board.height) % board.height, (j + dj + board.width) % board.width);
+                }
+            }
+            total -= board.d (i, j);
+            if (board.d (i, j)) {
+                return (2 <= total && total <= 3) ? 1 : 0;
+            } else {
+                return (total === 3) ? 1 : 0;
+            }
+        }),
+        size: [4, 4],
+    },
 };
 
 $('p1').onclick = () => {Game.problemId = 1; present (true);}
 $('p2').onclick = () => {Game.problemId = 2; present (true);}
 $('p3').onclick = () => {Game.problemId = 3; present (true);}
+$('p4').onclick = () => {Game.problemId = 4; present (true);}
 
 function present (refresh = false) {
     const problemId = Game.problemId;

@@ -32,6 +32,11 @@ function readBoard (bitstring) {
 }
 
 function pureRun (code, input, args) {
+    // Case: code is function
+    if (code instanceof Function) {
+        return {focus: code (input)};
+    }
+
     // P ('max size:', getMaxSize (code));
     const ast = codeToAst(code);
     // const tape = new Bitboard ([64, 64]).compileToVM (ast);
@@ -59,14 +64,18 @@ function areEquivalentUnderMask (code1, code2, inputSize, inputMask) {
                            (i, j) => (bitString >> (i*width+j))&1);
     }
 
-    const ast1 = codeToAst (code1);
+    const code1IsFunction = code1 instanceof Function;
+
+    const ast1 = code1IsFunction ? null : codeToAst (code1);
     const ast2 = codeToAst (code2);
     var n = inputMask;
     var testedCount = 0;
     while (true) {
         // Test equivalence on n;
         const board = toBoard (n);
-        const res1 = runAst (ast1, board, {});
+        const res1 = code1IsFunction
+              ? code1 (board)
+              : runAst (ast1, board, {});
         const res2 = runAst (ast2, board, {});
         testedCount ++;
         if (res1.equals (res2)) {
@@ -114,6 +123,34 @@ export function run (code, args) {
                                       Board.brandNew (5, 5),
                                       args);
     P ('radioactive:', radioactiveState.focus.toString()); */
+
+    // Add actions for display.
+    const inputBoard = $('input').children[0];
+    for (var i = 0; i < inputBoard.children.length; i++) {
+        const row = inputBoard.children[i];
+        for (var j = 0; j < row.children.length; j++) {
+            const cell = row.children[j];
+            cell.setAttribute ('data-ij', JSON.stringify ([i, j]));
+            cell.onclick = (e) => {
+                // args.<replace_board>
+                const orig = args.input;
+                const [i, j] = JSON.parse (e.target.getAttribute ('data-ij'));
+                const newBit = 1 ^ orig.d (i, j);
+                P (newBit);
+                args.input = Board.plot (orig.height, orig.width, (i2, j2) => {
+                    P ('executing at', i2, j2, i, j, newBit);
+                    if (i2 === i && j2 === j) {
+                        return newBit;
+                    } else {
+                        return orig.d (i2, j2);
+                    }
+                })
+                P ('args.input = ', args.input.toString ());
+                run (code, args);
+                P ('updated cell');
+            }
+        }
+    }
 }
 
 function getMaxSize (code) {
