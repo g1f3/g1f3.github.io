@@ -1,4 +1,4 @@
-import { Board } from './board.js';
+import { Board, traceVarMapBoard, getExecutionFunction } from './board.js';
 import { Bitboard } from './bitboard.js';
 
 export { Board } from './board.js';
@@ -90,18 +90,88 @@ function areEquivalentUnderMask (code1, code2, inputSize, inputMask) {
     return {equiv: true, testedCount};
 }
 
-export function areEquivalent (code1, code2, inputSize) {
-    const [height, width] = inputSize;
+/* --- default implementation.
+export function areEquivalent (code1, code2, game, solutionText) {
+    const [height, width] = game.size;
     
     const inputMask = (1 << (height*width)) - 1;
 
-    return areEquivalentUnderMask (code1, code2, inputSize, inputMask);
+    return areEquivalentUnderMask (code1, code2, game.size, inputMask);
+} --- */
+
+// Tells if two functions are equivalent by running them on a `Worker`,
+//     after compilation.
+export function areEquivalent (code1, code2, game, solutionText=null) {
+    const [height, width] = game.size;
+    
+    const inputMask = (1 << (height*width)) - 1;
+
+    P ('solutionText=',solutionText);
+    const fn1 = solutionText ?? getExecutionFunctionForAst (codeToAst(code1), game, 'a_');
+    const fn2 = getExecutionFunctionForAst (codeToAst(code2), game, 'b_');
+
+    const l = '{', r = '}';
+
+    // bit assignments
+    const pres = [];
+    const posts = [];
+    for (var i = 0; i < height; i++) {
+        for (var j = 0; j < width; j++) {
+            const shift = i * width + j;
+            pres.push (`in_${i}_${j} = (board >> ${shift}) & 1;\n`);
+        }
+    }
+
+    for (var i = 0; i < game.outputSize[0]; i++) {
+        for (var j = 0; j < game.outputSize[1]; j++) {
+            posts.push (`if (a_out_${i}_${j} !== b_out_${i}_${j}) return (${l} equiv: false, bitboard: board ${r});\n`);
+        }
+    }
+
+    const bitAssignments = pres.join ('');
+    const comparisons = posts.join ('');
+
+    // Template
+    const fullCode = `
+for (board = 0; board <= ${inputMask}; board++) ${l}
+${bitAssignments}
+${fn1}
+${fn2}
+${comparisons}
+${r}
+return (${l} equiv: true ${r});
+`;
+    P (fullCode);
+
+    // Execute function
+    const fn = Function (fullCode);
+    const result = fn ();
+    
+    if (result.equiv) {
+        result.testedCount = inputMask + 1;
+    } else {
+        const board = Board.plot (height, width, (i, j) => (result.bitboard >> (i * width + j)) & 1);
+        result.board = board;
+    }
+
+    return result;
+}
+
+export function getExecutionFunctionForAst (ast, args, prefix='a_') {
+    // Run radioactive
+    const radioactiveInput = Board.brandNew (args.size[0], args.size[1]);
+    const radioactiveFocus = runAst (ast,
+                                     radioactiveInput,
+                                     args);
+    return getExecutionFunction (radioactiveInput, radioactiveFocus, prefix);
 }
 
 export function run (code, args) {
+    P ('running...', code, args);
     const finalState = pureRun (code,
                                 args.input,
                                 args);
+    P ('running...', code, args, finalState);
     P (finalState.focus.toString ());
     $('display').innerHTML = '';
     $('display').appendChild (stateToTable (finalState));
@@ -119,10 +189,8 @@ export function run (code, args) {
     // Show player result
     $('output2').innerHTML = '';
     $('output2').appendChild (finalState.focus.toTable ());
-    /* const radioactiveState = pureRun (code,
-                                      Board.brandNew (5, 5),
-                                      args);
-    P ('radioactive:', radioactiveState.focus.toString()); */
+
+    // P ('code is', getExecutionFunctionForAst (codeToAst (code), args, 'abc_'));
 
     // Add actions for display.
     const inputBoard = $('input').children[0];

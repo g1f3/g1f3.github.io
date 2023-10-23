@@ -8,7 +8,14 @@ function andall (row) { return fold (row, 1, (a, b) => a & b); }
 function orall (row) { return fold (row, 0, (a, b) => a | b); }
 function xorall (row) { return fold (row, 0, (a, b) => a ^ b); }
 
-// TODO: add "bit-tracking" (radioactive) board.
+const Gensym = {n: 0n};
+
+// Unique string generator
+Gensym.next = () => {
+    Gensym.n ++;
+    return Symbol.for ('v' + Gensym.n.toString());
+}
+Gensym.order = (symbol) => BigInt (Symbol.keyFor(symbol).slice (1));
 
 export class Board {
     /** Primitive functions. */
@@ -54,7 +61,9 @@ export class Board {
     static brandNew (height, width) {
         return Board.plot (height, width,
                            (i, j) => new VarMap (
-                               1 << (i * width + j)
+                               1 << (i * width + j),
+                               'var',
+                               []
                            ));
     }
 
@@ -269,8 +278,13 @@ export class Board {
 }
 
 class VarMap {
-    constructor (val) {this.val = val};
-    toString () { return `VarMap(${this.val})`; }
+    constructor (val, type, children) {
+        this.val = val;
+        this.type = type;
+        this.children = children;
+        this.symbol = Gensym.next ();
+    };
+    toString () { return `VarMap(${this.val}, ${this.type}, ${this.children.length} children)`; }
 }
 
 function VarAnd (a, b) {
@@ -278,7 +292,7 @@ function VarAnd (a, b) {
     else if (a === 0) { return 0; }
     else if (b === 1) { return a; }
     else if (b === 0) { return 0; }
-    else { return new VarMap (a.val | b.val); }
+    else { return new VarMap (a.val | b.val, 'and', [a, b]); }
 }
 
 function VarOr (a, b) {
@@ -286,7 +300,7 @@ function VarOr (a, b) {
     else if (a === 0) { return b; }
     else if (b === 1) { return 1; }
     else if (b === 0) { return a; }
-    else { return new VarMap (a.val | b.val); }
+    else { return new VarMap (a.val | b.val, 'or', [a, b]); }
 }
 
 function VarXor (a, b) {
@@ -295,15 +309,96 @@ function VarXor (a, b) {
     else if (a === 0) { return b; }
     else if (b === 1) { return a; }
     else if (b === 0) { return a; }
-    else { return new VarMap (a.val | b.val); }
+    else { return new VarMap (a.val | b.val, 'xor', [a, b]); }
 }
 
 function VarNot (a) {
     if (typeof (a) === 'number') { return 1 ^ a; }
-    else { return a; }
+    else { return new VarMap (a.val, 'not', [a]); }
 }
 
 function VarAndAll (row) { return fold (row, 1, VarAnd); }
 function VarOrAll (row) { return fold (row, 0, VarOr); }
 function VarXorAll (row) { return fold (row, 0, VarXor); }
 
+// Generates a list of all VarMap-s used in listOfVars
+export function traceVarMap (listOfVars) {
+    const stack = [...listOfVars];
+    const map = new Map();
+
+    while (stack.length > 0) {
+        const elem = stack.pop ();
+        if (! (elem instanceof VarMap)) continue;
+        if (map.has (elem.symbol)) continue;
+
+        // elem is a new VarMap
+        map.set (elem.symbol, elem);
+        for (const child of elem.children) {
+            if (! map.has (child.symbol)) {
+                stack.push (child);
+            }
+        }
+    }
+
+    // Tracked all children
+    // console.log ('traceVarMap', map);
+    for (const [symbol, node] of map) {
+        console.log (symbol, '->', node);
+    }
+    console.log ([...map]);
+    return map;
+}
+
+// Traces each variable back to its roots
+export function traceVarMapBoard (board) {
+    const listOfVars = [];
+    for (var i = 0; i < board.height; i++) for (var j = 0; j < board.width; j++) {
+        listOfVars.push (board.d (i, j));
+    }
+    return traceVarMap (listOfVars);
+}
+
+// Compiles a function based on input ("brandnew") and output
+export function getExecutionFunction (input, output, prefix='a_') {
+    const map = traceVarMapBoard (output);
+    const list = [...map];
+    function compareBigints (a, b) {
+        return a < b ? -1 : a > b ? +1 : 0;
+    }
+    list.sort ((a, b) => compareBigints (Gensym.order(a[0]), Gensym.order(b[0])));
+    const ans = [];
+    for (const [name, def] of list) {
+        var typeset;
+        switch (def.type) {
+        case 'var':
+            var index = null;
+            for (var i = 0; i < input.height; i++) for (var j = 0; j < input.width; j++) {
+                if (input.d (i, j).val === def.val) {
+                    // Matching input
+                    index = [i, j]; break;
+                }
+            }
+            typeset = `in_${index[0]}_${index[1]}`;
+            break;
+        case 'and': typeset = `${prefix}${Symbol.keyFor(def.children[0].symbol)} & ${prefix}${Symbol.keyFor(def.children[1].symbol)}`; break;
+        case 'or': typeset = `${prefix}${Symbol.keyFor(def.children[0].symbol)} | ${prefix}${Symbol.keyFor(def.children[1].symbol)}`; break;
+        case 'xor': typeset = `${prefix}${Symbol.keyFor(def.children[0].symbol)} ^ ${prefix}${Symbol.keyFor(def.children[1].symbol)}`; break;
+        case 'not': typeset = `~ ${prefix}${Symbol.keyFor(def.children[0].symbol)}`; break;
+        default: throw new Exception (`No such operator: ${def.type}`);
+        }
+        ans.push (`${prefix}${Symbol.keyFor(name)} = ${typeset};\n`);
+    }
+
+    // Output list
+    for (var i = 0; i < output.height; i++) for (var j = 0; j < output.width; j++) {
+        var typeset;
+        if (output.d (i, j) instanceof VarMap) {
+            typeset = prefix + Symbol.keyFor (output.d (i, j).symbol);
+        } else {
+            typeset = output.d (i, j).toString ();
+        }
+        ans.push (`${prefix}out_${i}_${j} = ${typeset};\n`);
+    }
+
+    return ans.join ('');
+}

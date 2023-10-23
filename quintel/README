@@ -1,3 +1,9 @@
 Quintel: the 5x5 pattern finding game.
 (previous codenames: `hiddenrule`)
 
+TODOs:
+- Move execution code to Worker
+- Refactor (code is becoming spaghettily)
+
+As of 2023-10-21
+* Successful: compile to functions; testing 1<<25 (approx. 32 mil.) in circa 15 seconds.
